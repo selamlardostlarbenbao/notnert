@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dosya Yükleyici</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            text-align: center;
+            font-size: 2em;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 50px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f8f9ff;
+        }
+
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: #f0f1ff;
+        }
+
+        .upload-area.dragover {
+            background: #e8e9ff;
+            border-color: #764ba2;
+        }
+
+        .upload-icon {
+            font-size: 60px;
+            margin-bottom: 20px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+            transition: transform 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .files-list {
+            margin-top: 40px;
+        }
+
+        .file-item {
+            background: #f8f9ff;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .file-item a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .file-item a:hover {
+            text-decoration: underline;
+        }
+
+        .progress {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📤 Dosya Yükleyici</h1>
+        
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">☁️</div>
+            <p>Dosyayı buraya sürükleyin veya tıklayın</p>
+            <input type="file" id="fileInput" multiple>
+        </div>
+
+        <div class="progress" id="progress">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+
+        <div class="message" id="message"></div>
+
+        <div class="files-list">
+            <h2>📁 Yüklenen Dosyalar</h2>
+            <div id="filesList"></div>
+        </div>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const progress = document.getElementById('progress');
+        const progressBar = document.getElementById('progressBar');
+        const message = document.getElementById('message');
+        const filesList = document.getElementById('filesList');
+
+        // Dosya seçme
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        // Drag & Drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            handleFiles(files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        async function handleFiles(files) {
+            for (let file of files) {
+                await uploadFile(file);
+            }
+            loadFiles();
+        }
+
+        async function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            progress.style.display = 'block';
+            progressBar.style.width = '0%';
+
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                progressBar.style.width = '100%';
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage('✅ Dosya başarıyla yüklendi!', 'success');
+                } else {
+                    showMessage('❌ Hata: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showMessage('❌ Yükleme hatası: ' + error.message, 'error');
+            } finally {
+                setTimeout(() => {
+                    progress.style.display = 'none';
+                }, 1000);
+            }
+        }
+
+        async function loadFiles() {
+            try {
+                const response = await fetch('/api/files');
+                const data = await response.json();
+
+                if (data.files && data.files.length > 0) {
+                    filesList.innerHTML = data.files.map(file => `
+                        <div class="file-item">
+                            <a href="${file.url}" target="_blank">${file.name}</a>
+                            <span>${formatBytes(file.size)}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    filesList.innerHTML = '<p style="text-align:center; color:#999;">Henüz dosya yüklenmemiş</p>';
+                }
+            } catch (error) {
+                console.error('Dosyalar yüklenirken hata:', error);
+            }
+        }
+
+        function showMessage(text, type) {
+            message.textContent = text;
+            message.className = 'message ' + type;
+            message.style.display = 'block';
+            setTimeout(() => {
+                message.style.display = 'none';
+            }, 5000);
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        // Sayfa yüklendiğinde dosyaları getir
+        loadFiles();
+    </script>
+</body>
+</html>
